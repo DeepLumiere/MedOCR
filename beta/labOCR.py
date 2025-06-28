@@ -1,22 +1,16 @@
 import os
-import io
 import json
 import re
-from PIL import Image  # Used for opening images with pytesseract
-import pytesseract  # Python wrapper for Tesseract OCR
-import cv2  # OpenCV for image preprocessing (can leverage GPU if compiled with CUDA)
-import numpy as np  # For converting PIL images to OpenCV format
+import pytesseract
+import cv2
 import kagglehub
 from transformers import AutoProcessor, AutoModelForImageTextToText
 
-# --- PyTesseract Setup ---
 pytesseract.pytesseract.tesseract_cmd = r"R:\DeepWorks\DeepPython\MedOCR\tesseract\tesseract.exe"
 
 
 def preprocess_image_for_ocr(image_path):
-    """
-    Preprocesses an image for OCR by converting to grayscale and applying adaptive thresholding.
-    """
+
     try:
         img = cv2.imread(image_path)
         if img is None:
@@ -36,9 +30,7 @@ def preprocess_image_for_ocr(image_path):
 
 
 def extract_text_from_image_with_pytesseract(image_path):
-    """
-    Extracts raw text from an image using PyTesseract after preprocessing.
-    """
+
     try:
         preprocessed_img = preprocess_image_for_ocr(image_path)
         if preprocessed_img is None:
@@ -65,13 +57,11 @@ def extract_text_from_image_with_pytesseract(image_path):
         return None
 
 
-# --- Gemma 3n Setup ---
-# Define the custom path to your .kaggle directory
-# Replace '' with the actual path if you've moved your kaggle.json
+
 custom_kaggle_config_dir = ''
 os.environ['KAGGLE_CONFIG_DIR'] = custom_kaggle_config_dir
 
-processor, model = None, None  # Initialize to None
+processor, model = None, None
 try:
     GEMMA_PATH = kagglehub.model_download("google/gemma-3n/transformers/gemma-3n-e2b-it")
     processor = AutoProcessor.from_pretrained(GEMMA_PATH)
@@ -84,14 +74,11 @@ except Exception as e:
 
 def extract_json_with_gemma(text_to_analyze,
                             query_text="Given the following text, extract all relevant medical information into a JSON object with appropriate keys and values. Ensure numbers are parsed as numerical types. If a value is missing, use null. Example: {'PatientName': 'John Doe', 'BP': '120/80', 'HeartRate': 75, 'Glucose': 90.5}"):
-    """
-    Feeds extracted text into Gemma 3n to get structured JSON data.
-    """
+
     if processor is None or model is None:
         print("Gemma model not loaded. Skipping Gemma extraction.")
         return None
 
-    # Gemma expects messages in a specific format
     messages = [
         {
             "role": "user",
@@ -112,19 +99,17 @@ def extract_json_with_gemma(text_to_analyze,
         input_len = inputs["input_ids"].shape[-1]
 
         outputs = model.generate(**inputs, max_new_tokens=1024,
-                                 disable_compile=True)  # Increased max_new_tokens for potentially larger JSON output
+                                 disable_compile=True)
         gemma_response_text = processor.batch_decode(
             outputs[:, input_len:],
             skip_special_tokens=True,
             clean_up_tokenization_spaces=True
         )
 
-        # Gemma's response might include conversational filler, try to extract the JSON part
         json_match = re.search(r'```json\n(.*?)\n```', gemma_response_text[0], re.DOTALL)
         if json_match:
             json_string = json_match.group(1)
         else:
-            # If no code block, try to parse the whole response directly if it looks like JSON
             json_string = gemma_response_text[0].strip()
 
         try:
@@ -134,7 +119,6 @@ def extract_json_with_gemma(text_to_analyze,
         except json.JSONDecodeError as e:
             print(f"DEBUG: Gemma output is not valid JSON. Attempting direct parsing or returning raw text. Error: {e}")
             print(f"DEBUG: Gemma raw output: {json_string}")
-            # If it's not strictly JSON, we can return the raw text for manual inspection
             return {"gemma_raw_output": json_string}
 
     except Exception as e:
@@ -143,14 +127,9 @@ def extract_json_with_gemma(text_to_analyze,
 
 
 def process_lab_report_single_image(image_path):
-    """
-    Main function to process a single lab report image:
-    1. Extracts raw text using PyTesseract.
-    2. Feeds the raw text to Gemma 3n for structured JSON extraction.
-    """
+
     print(f"\n--- Starting processing for image: {image_path} ---")
 
-    # Step 1: Extract raw text using PyTesseract
     raw_text = extract_text_from_image_with_pytesseract(image_path)
 
     if not raw_text:
@@ -161,7 +140,6 @@ def process_lab_report_single_image(image_path):
     print(raw_text)
     print("------------------------------------------")
 
-    # Step 2: Feed raw text to Gemma 3n for JSON extraction
     print("\n--- Sending text to Gemma 3n for JSON extraction ---")
     gemma_parsed_data = extract_json_with_gemma(raw_text)
 
@@ -185,9 +163,7 @@ def process_lab_report_single_image(image_path):
         }, indent=4)
 
 
-# --- Running the Combined Process ---
-image_file_to_process = 'img.png'  # Use your single image here
-
+image_file_to_process = 'img.png'
 print(f"DEBUG: Checking for image file at: {os.path.abspath(image_file_to_process)}")
 if not os.path.exists(image_file_to_process):
     print(f"Error: Image file '{image_file_to_process}' not found. Please ensure it's in the same directory.")
