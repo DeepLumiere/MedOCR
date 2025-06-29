@@ -6,7 +6,6 @@ A versatile OCR toolkit designed for medical documents—such as prescriptions, 
 
 ## 🚀 Key Features
 
-- 🧩 **Dual OCR backends**: Choose between Tesseract (fast, local, open‑source) or Gemma 3 (powerful, multimodal image/text understanding).
 - 🔧 **Preprocessing**: Deskew, denoise, binarize, resize for optimal OCR performance.
 - 🧠 **Post-processing**: Medical spell-check, terminology normalization, structured JSON/CSV output.
 - 🛠️ **Modular architecture**: Swap pipelines, add custom models, extend processing.
