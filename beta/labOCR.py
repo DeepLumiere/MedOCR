@@ -3,14 +3,14 @@ import json
 import re
 import pytesseract
 import cv2
-import kagglehub
-from transformers import AutoProcessor, AutoModelForImageTextToText
+import kagglehub # Keep this if you plan to download the original model
 
+# Make sure this line is correct for your Tesseract installation
 pytesseract.pytesseract.tesseract_cmd = r"R:\DeepWorks\DeepPython\MedOCR\tesseract\tesseract.exe"
 
 
 def preprocess_image_for_ocr(image_path):
-
+    # Your existing code for preprocessing
     try:
         img = cv2.imread(image_path)
         if img is None:
@@ -29,8 +29,8 @@ def preprocess_image_for_ocr(image_path):
         return None
 
 
+# THIS IS THE FUNCTION THAT WAS MISSING OR MISPLACED
 def extract_text_from_image_with_pytesseract(image_path):
-
     try:
         preprocessed_img = preprocess_image_for_ocr(image_path)
         if preprocessed_img is None:
@@ -57,24 +57,49 @@ def extract_text_from_image_with_pytesseract(image_path):
         return None
 
 
+def correct_common_ocr_errors(text):
+    # Your existing code for OCR correction
+    corrected_text = text
+    # Example: Simple correction for '420' -> '4.20' if it appears near known lab test names
+    corrected_text = re.sub(r'(\d)(\d{2})\s*(U/L|mmol/L|mg/dL|g/dL)', r'\1.\2 \3', corrected_text)
+    corrected_text = re.sub(r'MCHC:\s*(\d{2})0', r'MCHC: \1.0', corrected_text)
+    print(f"DEBUG: Applied rule-based OCR corrections. Original length: {len(text)}, Corrected length: {len(corrected_text)}")
+    return corrected_text
 
-custom_kaggle_config_dir = ''
-os.environ['KAGGLE_CONFIG_DIR'] = custom_kaggle_config_dir
+
+# --- Gemma Model Loading ---
+from transformers import AutoProcessor, AutoModelForImageTextToText # Ensure this import is here
 
 processor, model = None, None
+FINE_TUNED_MODEL_PATH = "./fine_tuned_gemma_medical_extractor" # Path where you save your fine-tuned model
+custom_kaggle_config_dir = '' # Your custom Kaggle config directory
+os.environ['KAGGLE_CONFIG_DIR'] = custom_kaggle_config_dir
+
+
 try:
-    GEMMA_PATH = kagglehub.model_download("google/gemma-3n/transformers/gemma-3n-e2b-it")
-    processor = AutoProcessor.from_pretrained(GEMMA_PATH)
-    model = AutoModelForImageTextToText.from_pretrained(GEMMA_PATH, torch_dtype="auto", device_map="auto")
-    print("DEBUG: Gemma 3n model loaded successfully.")
+    if os.path.exists(FINE_TUNED_MODEL_PATH):
+        print(f"DEBUG: Loading fine-tuned Gemma model from {FINE_TUNED_MODEL_PATH}")
+        processor = AutoProcessor.from_pretrained(FINE_TUNED_MODEL_PATH)
+        model = AutoModelForImageTextToText.from_pretrained(FINE_TUNED_MODEL_PATH, torch_dtype="auto", device_map="auto")
+        print("DEBUG: Fine-tuned Gemma model loaded successfully.")
+    else:
+        # Fallback to original KaggleHub download if fine-tuned model not found
+        print("DEBUG: Fine-tuned model not found. Attempting to load original Gemma 3n from KaggleHub.")
+        # Make sure kagglehub is imported at the top if you use this line
+        GEMMA_PATH = kagglehub.model_download("google/gemma-3n/transformers/gemma-3n-e2b-it")
+        processor = AutoProcessor.from_pretrained(GEMMA_PATH)
+        model = AutoModelForImageTextToText.from_pretrained(GEMMA_PATH, torch_dtype="auto", device_map="auto")
+        print("DEBUG: Gemma 3n model loaded successfully from KaggleHub.")
+
 except Exception as e:
-    print(
-        f"ERROR: Could not load Gemma 3n model. Make sure you have downloaded it via KaggleHub and your kaggle.json is correctly configured. Error: {e}")
+    print(f"ERROR: Could not load Gemma model. Error: {e}")
+    # Set processor and model to None if loading fails, to prevent further errors
+    processor, model = None, None
 
 
 def extract_json_with_gemma(text_to_analyze,
-                            query_text="Given the following text, extract all relevant medical information into a JSON object with appropriate keys and values. Ensure numbers are parsed as numerical types. If a value is missing, use null. Example: {'PatientName': 'John Doe', 'BP': '120/80', 'HeartRate': 75, 'Glucose': 90.5}"):
-
+                            query_text="Given the following medical lab report text, extract all relevant information into a JSON object. Use standardized medical key names like 'PatientName', 'BP', 'HeartRate', 'Glucose', 'MCHC', etc. Ensure numerical values are parsed as numbers (float or int). If a value is not present, use null. Example: {'PatientName': 'John Doe', 'BP': '120/80', 'HeartRate': 75, 'Glucose': 90.5}"):
+    # Your existing code for Gemma extraction
     if processor is None or model is None:
         print("Gemma model not loaded. Skipping Gemma extraction.")
         return None
@@ -127,7 +152,7 @@ def extract_json_with_gemma(text_to_analyze,
 
 
 def process_lab_report_single_image(image_path):
-
+    # Your existing code for processing a single image
     print(f"\n--- Starting processing for image: {image_path} ---")
 
     raw_text = extract_text_from_image_with_pytesseract(image_path)
@@ -136,17 +161,20 @@ def process_lab_report_single_image(image_path):
         print("PyTesseract failed to extract any text. Cannot proceed with Gemma extraction.")
         return json.dumps({"status": "pytesseract_text_extraction_failed"}, indent=4)
 
-    print("\n--- Raw Text Extracted by PyTesseract ---")
-    print(raw_text)
+    corrected_raw_text = correct_common_ocr_errors(raw_text)
+
+    print("\n--- Raw Text Extracted by PyTesseract (with initial corrections) ---")
+    print(corrected_raw_text)
     print("------------------------------------------")
 
     print("\n--- Sending text to Gemma 3n for JSON extraction ---")
-    gemma_parsed_data = extract_json_with_gemma(raw_text)
+    gemma_parsed_data = extract_json_with_gemma(corrected_raw_text)
 
     if gemma_parsed_data:
         final_output = {
             "image_processed": image_path,
             "pytesseract_raw_text": raw_text,
+            "corrected_pytesseract_text": corrected_raw_text,
             "gemma_extracted_data": gemma_parsed_data
         }
         print("\n--- Final Combined Extracted Data (JSON) ---")
@@ -159,10 +187,12 @@ def process_lab_report_single_image(image_path):
         return json.dumps({
             "status": "gemma_extraction_failed",
             "image_processed": image_path,
-            "pytesseract_raw_text": raw_text
+            "pytesseract_raw_text": raw_text,
+            "corrected_pytesseract_text": corrected_raw_text
         }, indent=4)
 
 
+# Main execution block
 image_file_to_process = 'img.png'
 print(f"DEBUG: Checking for image file at: {os.path.abspath(image_file_to_process)}")
 if not os.path.exists(image_file_to_process):
