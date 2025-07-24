@@ -94,7 +94,6 @@ def correct_common_ocr_errors(text):
     return corrected_text
 
 
-# --- Gemma Model Loading ---
 from transformers import AutoProcessor, AutoModelForImageTextToText # Ensure this import is here
 
 processor, model = None, None
