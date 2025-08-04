@@ -1,10 +1,4 @@
-```markdown
 # 🩺✨ MedOCR: Mobile Lab Report Analysis with Gemma-3N & Unsloth FastModels 🚀📲
-
-=======
-![MedOCR Test Image](https://raw.githubusercontent.com/DeepLumiere/MedOCR/blob/main/labimage.png)
->>>>>>> main
----
 
 ## 🌟 Overview
 
@@ -90,6 +84,10 @@ def do_gemma_3n_inference(model, tokenizer, messages, max_new_tokens=4096):
 
 ### 4️⃣ Extract Medical Test Names
 
+Sample Image:
+---
+![MedOCR Test Image](https://raw.githubusercontent.com/DeepLumiere/MedOCR/main/labimage.png)
+---
 ```
 report_image = "(https://raw.githubusercontent.com/DeepLumiere/MedOCR/blob/main/labimage.png"
 
@@ -152,3 +150,4 @@ This project is licensed under the MIT License.
 ```
 
 [1] https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/81604858/9fe4535a-fbcd-43d4-ab85-e7c4beb02603/gemma-3n-submission-3.ipynb
+
