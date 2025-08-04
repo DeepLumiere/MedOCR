@@ -1,7 +1,6 @@
 # 🩺✨ MedOCR: Mobile Lab Report Analysis with Gemma-3N & Unsloth FastModels 🚀📲
 
-![MedOCR Test Image](https://raw.githubusercontent.com/DeepLumiere/MedOCR/master/beta/img.png)
-
+![MedOCR Test Image](https://raw.githubusercontent.com/DeepLumiere/MedOCR/blob/main/labimage.png)
 ---
 
 ## 🌟 Overview
